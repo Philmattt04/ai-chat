@@ -3,8 +3,6 @@ import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
 class ClaudeService {
-  // Relative URL — works on Netlify since the function lives on the same origin.
-  // For local dev run `netlify dev` (port 8888) or point to your deployed URL.
   static const String _apiUrl = '/.netlify/functions/chat';
 
   static Future<({String content, int inputTokens, int outputTokens})> sendMessage({
@@ -12,21 +10,20 @@ class ClaudeService {
     required String userMessage,
     required String personaId,
     required String model,
+    Attachment? attachment,
   }) async {
-    // Build the messages array for the API (exclude any loading placeholders)
-    final messages = [
-      ...history.map((m) => m.toApi()),
-      {'role': 'user', 'content': userMessage},
-    ];
-
     final response = await http
         .post(
           Uri.parse(_apiUrl),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
-            'messages': messages,
+            // Prior turns as plain text — attachments only apply to the current message
+            'history': history.map((m) => m.toApi()).toList(),
+            'userMessage': userMessage,
             'persona': personaId,
             'model': model,
+            // Attachment is sent separately; the Netlify function builds the content blocks
+            if (attachment != null) 'attachment': attachment.toJson(),
           }),
         )
         .timeout(const Duration(seconds: 60));

@@ -12,6 +12,8 @@ Vox AI gives you four specialized Claude personas to choose from. Each persona h
 
 Every conversation is backed by a Netlify serverless function that proxies requests to the Anthropic API, keeping your API key server-side and out of the browser. You can toggle between Claude Haiku (fast, cost-efficient) and Claude Sonnet (more capable) at any time, and a token counter tracks usage for the active persona.
 
+You can also attach files to any message using the paperclip button in the chat input. Images are sent to Claude's vision model, PDFs are processed as documents, and text/code files have their content included as context. A preview chip appears above the input before sending, and the file renders inside the message bubble after it's sent.
+
 ---
 
 ## Personas
@@ -57,12 +59,34 @@ A Socratic teacher who never gives the answer directly. Instead, asks one well-c
 
 ---
 
+## File Uploads
+
+Tap the **📎 paperclip button** in the chat input to attach a file. A preview chip appears above the input — tap ✕ to remove it before sending.
+
+| File type | How Claude uses it |
+|---|---|
+| **Images** (PNG, JPG, GIF, WEBP) | Sent as a vision content block — Claude can describe, analyse, or answer questions about the image |
+| **PDFs** | Sent as a document block — Claude reads the full text of the PDF |
+| **Text / code files** (TXT, MD, CSV, JS, TS, PY, DART, etc.) | Content is decoded and included as a fenced code block in the message |
+
+**Limit:** 10 MB per file. After sending, images render as thumbnails inside the message bubble and other files show a filename badge.
+
+### Example file upload prompts
+
+- Upload a screenshot → *"What's wrong with this UI layout?"*
+- Upload a PDF → *"Summarise the key points of this document."*
+- Upload a `.dart` file → *"Review this code and suggest improvements."*
+- Upload a CSV → *"What trends do you see in this data?"*
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | Flutter (web, iOS, Android) |
 | UI | Material 3, Google Fonts (Inter), flutter_markdown |
+| File handling | file_picker — images, PDFs, text and code files up to 10 MB |
 | Backend | Netlify Functions (Node.js) |
 | AI | Anthropic SDK — Claude Sonnet 4.6 / Haiku 4.5 |
 

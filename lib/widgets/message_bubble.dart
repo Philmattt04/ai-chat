@@ -99,6 +99,14 @@ class _MessageBubbleState extends State<MessageBubble>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        // Attachment preview at the top of the bubble
+                        if (widget.message.attachment != null)
+                          _AttachmentPreview(
+                            attachment: widget.message.attachment!,
+                            isUser: isUser,
+                            isDark: isDark,
+                          ),
+                        if (widget.message.content.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
@@ -192,6 +200,72 @@ class _MessageBubbleState extends State<MessageBubble>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Shows an image thumbnail or a file badge inside the message bubble
+class _AttachmentPreview extends StatelessWidget {
+  final Attachment attachment;
+  final bool isUser;
+  final bool isDark;
+
+  const _AttachmentPreview({
+    required this.attachment,
+    required this.isUser,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (attachment.kind == AttachmentKind.image) {
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        child: Image.memory(
+          attachment.bytes,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          // Cap image height so tall images don't dominate the chat
+          height: 200,
+        ),
+      );
+    }
+
+    // PDF / text file badge
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isUser
+            ? Colors.white.withValues(alpha: 0.15)
+            : isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : const Color(0xFFE5E7EB),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            attachment.kind == AttachmentKind.pdf
+                ? Icons.picture_as_pdf_rounded
+                : Icons.insert_drive_file_rounded,
+            size: 14,
+            color: isUser ? Colors.white70 : (isDark ? const Color(0xFF9ca3af) : const Color(0xFF6b7280)),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              attachment.filename,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: isUser ? Colors.white70 : (isDark ? const Color(0xFF9ca3af) : const Color(0xFF6b7280)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

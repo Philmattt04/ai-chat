@@ -53,7 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _sendMessage(String text) async {
+  Future<void> _sendMessage(String text, Attachment? attachment) async {
     setState(() {
       _loading = true;
       _error = '';
@@ -66,12 +66,14 @@ class _ChatScreenState extends State<ChatScreen> {
         userMessage: text,
         personaId: _persona,
         model: _model,
+        attachment: attachment,
       );
 
       setState(() {
         _currentChat.add(Message(
           role: MessageRole.user,
           content: text,
+          attachment: attachment,
           inputTokens: result.inputTokens,
         ));
         _currentChat.add(Message(
