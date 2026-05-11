@@ -5,3 +5,8 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+[dev]
+  command = "flutter run -d web-server --web-port 8080"
+  targetPort = 8080
+  port = 8888

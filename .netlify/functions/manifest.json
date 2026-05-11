@@ -1,1 +1,0 @@
-{"functions":[{"bundler":"esbuild","buildData":{"runtimeAPIVersion":1},"mainFile":"/Users/philsterr/Projects/ai_chat/netlify/functions/chat.js","name":"chat","priority":10,"path":"/Users/philsterr/Projects/ai_chat/.netlify/functions/chat.zip","runtime":"js"}],"system":{"arch":"arm64","platform":"darwin"},"timestamp":1778522708896,"version":1}

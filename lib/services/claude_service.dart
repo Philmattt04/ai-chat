@@ -39,8 +39,14 @@ class ClaudeService {
         outputTokens: (data['outputTokens'] as num).toInt(),
       );
     } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Request failed (${response.statusCode})');
+      String errorMessage;
+      try {
+        final error = jsonDecode(response.body) as Map<String, dynamic>;
+        errorMessage = error['error'] as String? ?? 'Request failed (${response.statusCode})';
+      } catch (_) {
+        errorMessage = 'Request failed (${response.statusCode})';
+      }
+      throw Exception(errorMessage);
     }
   }
 }

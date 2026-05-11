@@ -20,7 +20,10 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final List<Message> _messages = [];
+  // Each persona keeps its own independent conversation history
+  final Map<String, List<Message>> _chats = {};
+  List<Message> get _currentChat => _chats[_persona] ??= [];
+
   final _scrollCtrl = ScrollController();
   bool _loading = false;
   String _error = '';
@@ -28,9 +31,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String _model = 'claude-sonnet-4-6';
 
   int get _totalInputTokens =>
-      _messages.fold(0, (sum, m) => sum + (m.inputTokens ?? 0));
+      _currentChat.fold(0, (sum, m) => sum + (m.inputTokens ?? 0));
   int get _totalOutputTokens =>
-      _messages.fold(0, (sum, m) => sum + (m.outputTokens ?? 0));
+      _currentChat.fold(0, (sum, m) => sum + (m.outputTokens ?? 0));
 
   @override
   void dispose() {
@@ -59,21 +62,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final result = await ClaudeService.sendMessage(
-        history: _messages,
+        history: _currentChat,
         userMessage: text,
         personaId: _persona,
         model: _model,
       );
 
       setState(() {
-        // Add user message (with input token count)
-        _messages.add(Message(
+        _currentChat.add(Message(
           role: MessageRole.user,
           content: text,
           inputTokens: result.inputTokens,
         ));
-        // Add Claude response
-        _messages.add(Message(
+        _currentChat.add(Message(
           role: MessageRole.assistant,
           content: result.content,
           outputTokens: result.outputTokens,
@@ -91,9 +92,148 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _clearChat() {
     setState(() {
-      _messages.clear();
+      _currentChat.clear();
       _error = '';
     });
+  }
+
+  void _switchPersona(String id) {
+    setState(() {
+      _persona = id;
+      _error = '';
+    });
+    // Scroll to bottom of the newly selected persona's chat
+    _scrollToBottom();
+  }
+
+  void _showTokenUsage(BuildContext context) {
+    final isDark = widget.themeMode == ThemeMode.dark;
+    final total = _totalInputTokens + _totalOutputTokens;
+
+    // Approximate cost per million tokens (USD)
+    final isHaiku = _model.contains('haiku');
+    final inputRate  = isHaiku ? 0.80 : 3.00;
+    final outputRate = isHaiku ? 4.00 : 15.00;
+    final cost = (_totalInputTokens  / 1_000_000 * inputRate) +
+                 (_totalOutputTokens / 1_000_000 * outputRate);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1a1a2e) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : const Color(0xFFe5e7eb),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Token Usage',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_model.contains('haiku') ? 'Claude Haiku' : 'Claude Sonnet'}  ·  this session',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? const Color(0xFF6b7280)
+                    : const Color(0xFF9ca3af),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _TokenRow(
+              label: 'Input',
+              sublabel: 'tokens sent',
+              value: _totalInputTokens,
+              color: const Color(0xFF6366f1),
+              isDark: isDark,
+            ),
+            const SizedBox(height: 10),
+            _TokenRow(
+              label: 'Output',
+              sublabel: 'tokens received',
+              value: _totalOutputTokens,
+              color: const Color(0xFF34d399),
+              isDark: isDark,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Divider(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : const Color(0xFFe5e7eb),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF111827),
+                  ),
+                ),
+                Text(
+                  '$total tokens',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4f46e5),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Estimated cost',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? const Color(0xFF6b7280)
+                        : const Color(0xFF9ca3af),
+                  ),
+                ),
+                Text(
+                  total == 0 ? r'$0.00' : '\$${cost.toStringAsFixed(5)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                    color: isDark
+                        ? const Color(0xFF9ca3af)
+                        : const Color(0xFF6b7280),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -122,39 +262,48 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(width: 10),
             Text(
-              'AI Chat',
+              'Vox AI',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white : const Color(0xFF111827),
               ),
             ),
-            if (_totalOutputTokens > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${_totalInputTokens}↑ ${_totalOutputTokens}↓',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                    color: isDark
-                        ? const Color(0xFF6b7280)
-                        : const Color(0xFF9ca3af),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
         actions: [
+          // Token usage button
+          if (_totalOutputTokens > 0)
+            GestureDetector(
+              onTap: () => _showTokenUsage(context),
+              child: Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4f46e5).withValues(alpha: isDark ? 0.15 : 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF4f46e5).withValues(alpha: isDark ? 0.3 : 0.2),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('⚡', style: TextStyle(fontSize: 11)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_totalInputTokens + _totalOutputTokens}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF818cf8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // Model toggle
           GestureDetector(
             onTap: () => setState(() {
@@ -190,7 +339,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           // Clear chat
-          if (_messages.isNotEmpty)
+          if (_currentChat.isNotEmpty)
             IconButton(
               icon: Icon(Icons.delete_outline_rounded,
                   size: 19,
@@ -227,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 8),
               PersonaSelector(
                 selected: _persona,
-                onSelect: (id) => setState(() => _persona = id),
+                onSelect: _switchPersona,
               ),
               const SizedBox(height: 8),
             ],
@@ -237,17 +386,17 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _messages.isEmpty && !_loading
-                ? _EmptyState(isDark: isDark)
+            child: _currentChat.isEmpty && !_loading
+                ? _EmptyState(isDark: isDark, persona: _persona)
                 : ListView.builder(
                     controller: _scrollCtrl,
                     padding: const EdgeInsets.only(top: 12, bottom: 8),
-                    itemCount: _messages.length + (_loading ? 1 : 0),
+                    itemCount: _currentChat.length + (_loading ? 1 : 0),
                     itemBuilder: (context, i) {
-                      if (i == _messages.length) {
+                      if (i == _currentChat.length) {
                         return const TypingIndicator();
                       }
-                      return MessageBubble(message: _messages[i]);
+                      return MessageBubble(message: _currentChat[i]);
                     },
                   ),
           ),
@@ -289,17 +438,68 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _TokenRow extends StatelessWidget {
+  final String label;
+  final String sublabel;
+  final int value;
+  final Color color;
   final bool isDark;
-  const _EmptyState({required this.isDark});
+
+  const _TokenRow({
+    required this.label,
+    required this.sublabel,
+    required this.value,
+    required this.color,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            '$label  ·  $sublabel',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? const Color(0xFF9ca3af) : const Color(0xFF6b7280),
+            ),
+          ),
+        ),
+        Text(
+          '$value',
+          style: TextStyle(
+            fontSize: 13,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w500,
+            color: isDark ? const Color(0xFFe5e7eb) : const Color(0xFF1f2937),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final bool isDark;
+  final String persona;
+  const _EmptyState({required this.isDark, required this.persona});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Persona.all.firstWhere((p) => p.id == persona,
+        orElse: () => Persona.all.first);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('✨',
+          Text(p.emoji,
               style: TextStyle(
                   fontSize: 40,
                   color: isDark
@@ -307,7 +507,7 @@ class _EmptyState extends StatelessWidget {
                       : const Color(0xFFd1d5db))),
           const SizedBox(height: 12),
           Text(
-            'Start a conversation',
+            p.label,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
@@ -318,7 +518,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Pick a persona above and send your first message.',
+            'No messages yet. Send one to start.',
             style: TextStyle(
               fontSize: 12,
               color: isDark

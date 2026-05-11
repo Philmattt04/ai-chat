@@ -26,7 +26,7 @@ class _AIChatAppState extends State<AIChatApp> {
     final base = GoogleFonts.interTextTheme();
 
     return MaterialApp(
-      title: 'AI Chat — Philippe Mathieu',
+      title: 'Vox AI — Philippe Mathieu',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(
